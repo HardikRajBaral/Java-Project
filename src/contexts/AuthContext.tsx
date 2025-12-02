@@ -74,36 +74,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, username: string, password: string, role: 'customer' | 'admin' = 'customer') => {
+  const register = async (
+  email: string,
+  username: string,
+  password: string,
+  role: 'customer' | 'admin' = 'customer'
+) => {
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        username,
+        password,
+        role: role.toUpperCase(), // Must match backend enum
+      }),
+    });
+
+    const text = await response.text();
+
+    let data: any;
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, username, password, role }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Registration failed');
-      }
-
-      const data = await response.json();
-      
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
-      setAuthState({
-        user: data.user,
-        token: data.token,
-        loading: false,
-      });
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error('Invalid JSON from server');
     }
-  };
+
+    if (!response.ok) {
+      // Use the parsed data, do NOT call response.json() again
+      throw new Error(data.message || 'Registration failed');
+    }
+
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+
+    setAuthState({
+      user: data.user,
+      token: data.token,
+      loading: false,
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    throw error;
+  }
+};
+
 
   const logout = () => {
     localStorage.removeItem('token');
