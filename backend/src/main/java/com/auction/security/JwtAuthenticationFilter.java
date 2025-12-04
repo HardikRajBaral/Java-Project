@@ -1,63 +1,96 @@
 package com.auction.security;
 
-import com.auction.service.UserService;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
+import com.auction.service.UserService;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Autowired
-    private UserService userService;
+    private JwtUtil jwtUtil;          // your existing util
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private UserService userService;  // implements UserDetailsService
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
-                                  FilterChain chain) throws ServletException, IOException {
-        
-        final String requestTokenHeader = request.getHeader("Authorization");
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
 
-        String username = null;
-        String jwtToken = null;
+        String path = request.getServletPath();
 
-        // JWT Token is in the form "Bearer token". Remove Bearer word and get only the Token
-        if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
-            jwtToken = requestTokenHeader.substring(7);
+        // 🔹 Completely skip JWT auth for:
+        //    - auth endpoints (login, register, etc.)
+        //    - health checks
+        //    - public auctions list
+        if (path.startsWith("/api/auth/")
+                || path.startsWith("/api/health")
+                || "/api/auctions/active".equals(path)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        final String authHeader = request.getHeader("Authorization");
+
+        // No token -> continue as anonymous
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        final String jwt = authHeader.substring(7);
+        String userEmail = null;
+
+        try {
+            userEmail = jwtUtil.extractUsername(jwt); // use your JwtUtil method name
+        } catch (Exception e) {
+            // invalid token -> ignore and continue
+            System.out.println("Invalid JWT token: " + e.getMessage());
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
-                username = jwtUtil.extractUsername(jwtToken);
-            } catch (Exception e) {
-                logger.error("Unable to get JWT Token", e);
+                UserDetails userDetails = userService.loadUserByUsername(userEmail);
+
+                if (jwtUtil.validateToken(jwt, userDetails)) { // your validate method
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+
+            } catch (UsernameNotFoundException ex) {
+                // Token refers to a user that no longer exists -> ignore token
+                System.out.println("JWT for non-existing user: " + userEmail);
+            } catch (Exception ex) {
+                System.out.println("Error during JWT authentication: " + ex.getMessage());
             }
         }
 
-        // Once we get the token validate it.
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userService.loadUserByUsername(username);
-
-            // if token is valid configure Spring Security to manually set authentication
-            if (jwtUtil.validateToken(jwtToken, userDetails)) {
-                UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = 
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                usernamePasswordAuthenticationToken
-                    .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                // After setting the Authentication in the context, we specify
-                // that the current user is authenticated. So it passes the Spring Security Configurations successfully.
-                SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-            }
-        }
-        chain.doFilter(request, response);
+        filterChain.doFilter(request, response);
     }
 }
