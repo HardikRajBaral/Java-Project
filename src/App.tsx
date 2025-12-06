@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
-import AdminPanel from './components/AdminPanel';
 import AuctionList from './components/AuctionList';
 import Navigation from './components/Navigation';
 
@@ -22,7 +21,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Not logged in -> show login / register form
+  // Not logged in → show login/register
   if (!user) {
     return <AuthForm mode={authMode} onModeChange={setAuthMode} />;
   }
@@ -31,15 +30,11 @@ const AppContent: React.FC = () => {
   const isAdmin = role === 'admin';
 
   const renderCurrentView = () => {
-    // If non-admin somehow has 'dashboard' view, force them back to auctions
-    if (!isAdmin && currentView === 'dashboard') {
-      return <AuctionList />;
-    }
-
     switch (currentView) {
       case 'dashboard':
-        // Admin’s dashboard = AdminPanel
-        return isAdmin ? <AdminPanel /> : <Dashboard />; // fallback, but customer never sees button
+        // ONE SINGLE DASHBOARD for both admin & customer
+        // (Dashboard itself will show admin-specific bits if needed)
+        return <Dashboard />;
 
       case 'auctions':
       default:
@@ -49,7 +44,11 @@ const AppContent: React.FC = () => {
 
   return (
     <Layout>
-      <Navigation currentView={currentView} onViewChange={setCurrentView} />
+      {/* Navigation already hides Dashboard tab for non-admins */}
+      <Navigation
+        currentView={currentView}
+        onViewChange={setCurrentView}
+      />
       {renderCurrentView()}
     </Layout>
   );

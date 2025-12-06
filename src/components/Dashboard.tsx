@@ -1,149 +1,167 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { AuctionItem } from '../types';
-import { Plus, Clock, DollarSign, Eye, Edit, Trash2 } from 'lucide-react';
-import AuctionForm from './AuctionForm';
-import AuctionCard from './AuctionCard';
+// src/components/Dashboard.tsx
+import React, { useEffect, useState } from "react";
+import api from "../api";
+import AuctionForm from "./AuctionForm";
+
+interface DashboardStats {
+  totalListings: number;
+  activeAuctions: number;
+  pendingApproval: number;
+  totalValue: number;
+}
+
+interface AuctionRow {
+  id: string;
+  title: string;
+  current_price: number;
+  status: string;
+}
 
 const Dashboard: React.FC = () => {
-  const { user, token } = useAuth();
-  const [auctions, setAuctions] = useState<AuctionItem[]>([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalListings: 0,
+    activeAuctions: 0,
+    pendingApproval: 0,
+    totalValue: 0,
+  });
+  const [auctions, setAuctions] = useState<AuctionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    fetchUserAuctions();
-  }, []);
-
-  const fetchUserAuctions = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/auctions/my-auctions', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      const res = await api.get("/auctions/my-auctions");
+      const list: any[] = res.data || [];
+
+      const totalListings = list.length;
+      const activeAuctions = list.filter((a) => a.status === "active").length;
+      const pendingApproval = list.filter(
+        (a) => a.status === "pending" || a.status === "PENDING"
+      ).length;
+      const totalValue = list.reduce(
+        (sum, a) => sum + (a.current_price || 0),
+        0
+      );
+
+      setStats({
+        totalListings,
+        activeAuctions,
+        pendingApproval,
+        totalValue,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setAuctions(data);
-      }
-    } catch (error) {
-      console.error('Error fetching auctions:', error);
+      setAuctions(
+        list.map((a) => ({
+          id: a.id,
+          title: a.title,
+          current_price: a.current_price,
+          status: a.status,
+        }))
+      );
+    } catch (err) {
+      console.error("Failed to load my auctions", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAuctionCreated = () => {
-    setShowCreateForm(false);
-    fetchUserAuctions();
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    loadData();
+  }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-6xl mx-auto py-8 px-4">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-          <p className="text-gray-600 mt-1">Manage your auction listings</p>
+          <h1 className="text-2xl font-bold">My Dashboard</h1>
+          <p className="text-gray-500">
+            Manage your auction listings
+          </p>
         </div>
-        
         <button
-          onClick={() => setShowCreateForm(true)}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+          onClick={() => setShowForm(true)}
+          className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold"
         >
-          <Plus className="h-5 w-5" />
-          <span>List Item</span>
+          + List Item
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Listings</p>
-              <p className="text-3xl font-bold text-gray-900">{auctions.length}</p>
-            </div>
-            <Eye className="h-8 w-8 text-blue-600" />
-          </div>
+      {/* Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-sm text-gray-500">Total Listings</p>
+          <p className="text-2xl font-semibold mt-2">{stats.totalListings}</p>
         </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Auctions</p>
-              <p className="text-3xl font-bold text-green-600">
-                {auctions.filter(a => a.status === 'active').length}
-              </p>
-            </div>
-            <Clock className="h-8 w-8 text-green-600" />
-          </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-sm text-gray-500">Active Auctions</p>
+          <p className="text-2xl font-semibold mt-2">
+            {stats.activeAuctions}
+          </p>
         </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pending Approval</p>
-              <p className="text-3xl font-bold text-amber-600">
-                {auctions.filter(a => a.status === 'pending').length}
-              </p>
-            </div>
-            <Clock className="h-8 w-8 text-amber-600" />
-          </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-sm text-gray-500">Pending Approval</p>
+          <p className="text-2xl font-semibold mt-2">
+            {stats.pendingApproval}
+          </p>
         </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Value</p>
-              <p className="text-3xl font-bold text-blue-600">
-                ${auctions.reduce((sum, a) => sum + a.current_price, 0).toLocaleString()}
-              </p>
-            </div>
-            <DollarSign className="h-8 w-8 text-blue-600" />
-          </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-sm text-gray-500">Total Value</p>
+          <p className="text-2xl font-semibold mt-2">${stats.totalValue}</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Your Auction Listings</h2>
+      {/* Table / Empty state */}
+      <div className="bg-white rounded-xl shadow">
+        <div className="px-6 py-4 border-b">
+          <h2 className="font-semibold">Your Auction Listings</h2>
         </div>
-        
-        <div className="p-6">
-          {auctions.length === 0 ? (
-            <div className="text-center py-12">
-              <Eye className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No auctions yet</h3>
-              <p className="text-gray-600 mb-4">Get started by listing your first item for auction.</p>
-              <button
-                onClick={() => setShowCreateForm(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
-              >
-                List Your First Item
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {auctions.map((auction) => (
-                <AuctionCard key={auction.id} auction={auction} showActions />
+
+        {loading ? (
+          <div className="px-6 py-10 text-center text-gray-500">
+            Loading...
+          </div>
+        ) : auctions.length === 0 ? (
+          <div className="px-6 py-10 text-center text-gray-500">
+            <p className="mb-2 font-medium">No auctions yet</p>
+            <p className="mb-4">
+              Get started by listing your first item for auction.
+            </p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold"
+            >
+              List Your First Item
+            </button>
+          </div>
+        ) : (
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b">
+                <th className="px-6 py-3 text-sm text-gray-500">Title</th>
+                <th className="px-6 py-3 text-sm text-gray-500">
+                  Current Price
+                </th>
+                <th className="px-6 py-3 text-sm text-gray-500">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auctions.map((a) => (
+                <tr key={a.id} className="border-b last:border-0">
+                  <td className="px-6 py-3">{a.title}</td>
+                  <td className="px-6 py-3">${a.current_price}</td>
+                  <td className="px-6 py-3 capitalize">{a.status}</td>
+                </tr>
               ))}
-            </div>
-          )}
-        </div>
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {showCreateForm && (
+      {showForm && (
         <AuctionForm
-          onClose={() => setShowCreateForm(false)}
-          onSuccess={handleAuctionCreated}
+          onClose={() => setShowForm(false)}
+          onCreated={loadData}
         />
       )}
     </div>
