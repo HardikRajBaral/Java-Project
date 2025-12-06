@@ -1,220 +1,162 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { X, Upload, DollarSign, Calendar } from 'lucide-react';
+// src/components/AuctionForm.tsx
+import React, { useState } from "react";
+import api from "../api";
 
-interface AuctionFormProps {
+interface Props {
   onClose: () => void;
-  onSuccess: () => void;
+  onCreated: () => void; // refresh dashboard after success
 }
 
-const AuctionForm: React.FC<AuctionFormProps> = ({ onClose, onSuccess }) => {
-  const { token } = useAuth();
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    starting_price: '',
-    image_url: '',
-    category: '',
-    auction_end: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const categories = [
-    'Electronics',
-    'Art & Collectibles',
-    'Fashion',
-    'Home & Garden',
-    'Sports',
-    'Automotive',
-    'Books',
-    'Jewelry',
-    'Other'
-  ];
+const AuctionForm: React.FC<Props> = ({ onClose, onCreated }) => {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startingPrice, setStartingPrice] = useState("0");
+  const [category, setCategory] = useState("Electronics");
+  const [imageUrl, setImageUrl] = useState("");
+  const [auctionEnd, setAuctionEnd] = useState(""); // ISO string from datetime-local
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      const response = await fetch('/api/auctions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          starting_price: parseFloat(formData.starting_price),
-        }),
-      });
+      const payload = {
+        title,
+        description,
+        starting_price: parseFloat(startingPrice),
+        category,
+        image_url: imageUrl,
+        auction_end: auctionEnd, // e.g. "2025-12-06T16:30:00"
+      };
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create auction');
-      }
+      await api.post("/auctions", payload);
 
-      onSuccess();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      alert("Auction created successfully!");
+      onCreated();
+      onClose();
+    } catch (err: any) {
+      console.error("Failed to create auction:", err);
+      const status = err?.response?.status;
+      alert(`Failed to create auction (status ${status ?? "?"})`);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-screen overflow-y-auto">
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">List New Item</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">List New Item</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+            className="text-gray-500 hover:text-gray-700 text-2xl"
           >
-            <X className="h-6 w-6" />
+            ×
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title */}
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-              Item Title
-            </label>
+            <label className="block text-sm font-medium mb-1">Item Title</label>
             <input
-              id="title"
-              name="title"
               type="text"
+              className="w-full border rounded-lg px-3 py-2"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               required
-              value={formData.title}
-              onChange={handleChange}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-              placeholder="Enter item title"
             />
           </div>
 
+          {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
+            <label className="block text-sm font-medium mb-1">Description</label>
             <textarea
-              id="description"
-              name="description"
-              rows={4}
+              className="w-full border rounded-lg px-3 py-2 h-24"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               required
-              value={formData.description}
-              onChange={handleChange}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-              placeholder="Describe your item..."
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Starting price */}
             <div>
-              <label htmlFor="starting_price" className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-1">
                 Starting Price
               </label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  id="starting_price"
-                  name="starting_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  value={formData.starting_price}
-                  onChange={handleChange}
-                  className="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                  placeholder="0.00"
-                />
-              </div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full border rounded-lg px-3 py-2"
+                value={startingPrice}
+                onChange={(e) => setStartingPrice(e.target.value)}
+                required
+              />
             </div>
 
+            {/* Category */}
             <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-1">
                 Category
               </label>
               <select
-                id="category"
-                name="category"
-                required
-                value={formData.category}
-                onChange={handleChange}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                className="w-full border rounded-lg px-3 py-2"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
               >
-                <option value="">Select category</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
+                <option value="Electronics">Electronics</option>
+                <option value="Collectibles">Collectibles</option>
+                <option value="Fashion">Fashion</option>
+                <option value="Sports">Sports</option>
               </select>
             </div>
           </div>
 
+          {/* Image URL */}
           <div>
-            <label htmlFor="image_url" className="block text-sm font-medium text-gray-700 mb-1">
-              Image URL
-            </label>
-            <div className="relative">
-              <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="image_url"
-                name="image_url"
-                type="url"
-                required
-                value={formData.image_url}
-                onChange={handleChange}
-                className="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
+            <label className="block text-sm font-medium mb-1">Image URL</label>
+            <input
+              type="text"
+              className="w-full border rounded-lg px-3 py-2"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              required
+            />
           </div>
 
+          {/* Auction end */}
           <div>
-            <label htmlFor="auction_end" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium mb-1">
               Auction End Date & Time
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="auction_end"
-                name="auction_end"
-                type="datetime-local"
-                required
-                value={formData.auction_end}
-                onChange={handleChange}
-                className="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-              />
-            </div>
+            <input
+              type="datetime-local"
+              className="w-full border rounded-lg px-3 py-2"
+              value={auctionEnd}
+              onChange={(e) => setAuctionEnd(e.target.value)}
+              required
+            />
           </div>
 
-          <div className="flex space-x-4 pt-4">
+          <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors duration-200"
+              className="px-4 py-2 rounded-lg border"
+              disabled={submitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"
+              disabled={submitting}
             >
-              {loading ? 'Creating...' : 'List Item'}
+              {submitting ? "Listing..." : "List Item"}
             </button>
           </div>
         </form>

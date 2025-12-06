@@ -1,24 +1,28 @@
 package com.auction.service;
 
-import com.auction.entity.User;
-import com.auction.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Optional;
+
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import com.auction.entity.User;
+import com.auction.repository.UserRepository;
 
 @Service
 public class UserService implements UserDetailsService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    // ✅ Constructor injection – no @Autowired fields
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -34,13 +38,19 @@ public class UserService implements UserDetailsService {
             throw new RuntimeException("Username already exists");
         }
 
+        if (role == null) role = User.Role.CUSTOMER;
+
         User user = new User();
         user.setEmail(email);
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
         user.setRole(role);
 
-        return userRepository.save(user);
+        try {
+            return userRepository.save(user);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create user: " + e.getMessage());
+        }
     }
 
     public Optional<User> findByEmail(String email) {
@@ -49,9 +59,5 @@ public class UserService implements UserDetailsService {
 
     public Optional<User> findById(String id) {
         return userRepository.findById(id);
-    }
-
-    public boolean validatePassword(String rawPassword, String encodedPassword) {
-        return passwordEncoder.matches(rawPassword, encodedPassword);
     }
 }

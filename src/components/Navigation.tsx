@@ -1,6 +1,5 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Home, Gavel, Settings, User, Plus } from 'lucide-react';
 
 interface NavigationProps {
   currentView: string;
@@ -10,40 +9,37 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
   const { user } = useAuth();
 
-  const customerNavItems = [
-    { id: 'auctions', label: 'Browse Auctions', icon: Gavel },
-    { id: 'dashboard', label: 'My Dashboard', icon: User },
-  ];
+  if (!user) return null;
 
-  const adminNavItems = [
-    { id: 'auctions', label: 'Browse Auctions', icon: Gavel },
-    { id: 'admin', label: 'Admin Panel', icon: Settings },
-  ];
+  const role = user.role?.toLowerCase();
+  const isAdmin = role === 'admin';
 
-  const navItems = user?.role === 'admin' ? adminNavItems : customerNavItems;
+  const baseButton =
+    'px-4 py-2 text-sm font-medium rounded-md border shadow-sm transition duration-150';
+  const active = 'bg-blue-600 text-white border-blue-600 shadow';
+  const inactive = 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100';
 
   return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav className="flex space-x-8">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onViewChange(item.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                  currentView === item.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+    <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center space-x-3">
+
+        {/* Auctions (everyone) */}
+        <button
+          onClick={() => onViewChange('auctions')}
+          className={`${baseButton} ${currentView === 'auctions' ? active : inactive}`}
+        >
+          Auctions
+        </button>
+
+        {/* Dashboard ONLY for admin */}
+        {isAdmin && (
+          <button
+            onClick={() => onViewChange('dashboard')}
+            className={`${baseButton} ${currentView === 'dashboard' ? active : inactive}`}
+          >
+            Dashboard
+          </button>
+        )}
       </div>
     </div>
   );
