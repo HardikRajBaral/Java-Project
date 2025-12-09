@@ -1,0 +1,15 @@
+com\example\auctionapp\AuctionAppApplication.class
+com\example\auctionapp\model\User.class
+com\example\auctionapp\config\CorsConfig$1.class
+com\example\auctionapp\dto\SignupRequest.class
+com\example\auctionapp\repository\AuctionRepository.class
+com\example\auctionapp\dto\LoginRequest.class
+com\example\auctionapp\model\Auction.class
+com\example\auctionapp\repository\UserRepository.class
+com\example\auctionapp\controller\AdminAuctionController.class
+com\example\auctionapp\controller\AuctionController.class
+com\example\auctionapp\controller\AuthController.class
+com\example\auctionapp\dto\BidRequest.class
+com\example\auctionapp\dto\CreateAuctionRequest.class
+com\example\auctionapp\model\Role.class
+com\example\auctionapp\config\CorsConfig.class
